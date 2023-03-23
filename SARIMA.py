@@ -117,11 +117,11 @@ for i in folder:
   """
 
   #compare prediction to real
-  prediction = best_model.predict(start = -10, end = -1)
+  prediction = best_model.predict(start = -prediction_size, end = -1)
   prediction = list(prediction)
 
   # Make a dataframe containing actual and predicted prices
-  comparison = pd.DataFrame({'actual': [106521, 66597, 60857, 68923, 48330, 28465, 28386, 28872, 10537, 426],
+  comparison = pd.DataFrame({'actual': data.freq.values[-prediction_size:],
                   'prediction':prediction},index = pd.date_range(start='2023-02-08', periods=10,))
 
   #find the MAPE of the model
