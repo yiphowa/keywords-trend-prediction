@@ -75,7 +75,7 @@ parameters = product(ps, qs, Ps, Qs)
 parameters_list = list(parameters)
 
 
-PATH = "/content/drive/MyDrive/scpwr/trend/tmp"
+PATH = "./tmp"
 folder = os.listdir(PATH)
 breakno=0
 breaktill=1
