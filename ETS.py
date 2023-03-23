@@ -8,7 +8,7 @@ from IPython.display import clear_output
 %matplotlib inline
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
-PATH = "/content/drive/MyDrive/scpwr/trend/tmp"
+PATH = "./tmp"
 folder = os.listdir(PATH)
 breakno=0
 breaktill=10
