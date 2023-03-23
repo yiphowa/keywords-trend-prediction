@@ -78,7 +78,7 @@ parameters_list = list(parameters)
 PATH = "./tmp"
 folder = os.listdir(PATH)
 breakno=0
-breaktill=1
+breaktill=10
 N =3 #how many 'hot' keywords are shown
 cm_prob_df = pd.DataFrame() #comparing scores set(probability difference between actual value and predicted value)
 cm_perdiff_df = pd.DataFrame() #comparing scores set(the percentage difference of actual value to predicted value)
@@ -86,17 +86,6 @@ prediction_size = 10 #how many date to predict
 
 for i in folder:
   data = pd.read_csv(os.path.join(PATH,i), sep = ",", parse_dates=["dates"])
-
-  #print original value
-  """
-  plt.figure(figsize=(17, 8))
-  plt.plot(data.dates, data.freq)
-  plt.title('')
-  plt.ylabel('kw freq')
-  plt.xlabel('day')
-  plt.grid(False)
-  plt.show()
-  """
 
   #test p value
   p_value = sm.tsa.stattools.adfuller(data.freq)[1]
@@ -111,18 +100,19 @@ for i in folder:
   best_model = sm.tsa.statespace.SARIMAX(data.freq, order=(p, d, q),
                                        seasonal_order=(P, D, Q, s)).fit(disp=-1)
 
+  #predict
+  try:
+    pred = best_model.get_prediction(start=-prediction_size, end=-1)
+  except:
+    print(i,"dt have 2023-02-17 data")
+    pred = best_model.get_prediction(start=-prediction_size-1, end=-2)
+ 
+  '''
   #for stat info
-  """
   print(best_model.summary())
-  """
-
-  #compare prediction to real
-  prediction = best_model.predict(start = -prediction_size, end = -1)
-  prediction = list(prediction)
-
   # Make a dataframe containing actual and predicted prices
   comparison = pd.DataFrame({'actual': data.freq.values[-prediction_size:],
-                  'prediction':prediction},index = pd.date_range(start='2023-02-08', periods=10,))
+                  'prediction':pred.predicted_mean.values},index = pd.date_range(start='2023-02-08', periods=10,))
 
   #find the MAPE of the model
   mape = find_mape(comparison.actual,comparison.prediction)
@@ -131,7 +121,6 @@ for i in folder:
   else: stationary="stationary"
 
   #Plot prediction vs actual price
-  '''
   plt.figure(figsize=(17, 8))
   plt.plot(comparison.actual, label="actual")
   plt.plot(comparison.prediction, label="prediction")
@@ -142,11 +131,55 @@ for i in folder:
   plt.grid(False)
   plt.show()
   '''
-  
+    
+  #-------------------------------------------------
+  #compute the comparing score
+  '''
+  cm_prob: probability of the outer region that barely contains actual value 
+      -> lower prob. -> rarer actual value -> "hotter" keyword
+  cm_perdiff: the percentage difference of actual value to predicted value
+        -> higher difference -> rarer actual value -> "hotter" keyword
+  '''
+  #-------------------------------------------------
+  actual_df = data.freq.values[-prediction_size:]#the actual value
+  cm_prob = np.zeros(prediction_size) #comparing score(probability of the outer region that bearly contains actual value)
+  cm_perdiff = np.zeros(prediction_size) #comparing score(the percentage difference of actual value to predicted value)
+
+  #for every forecast value, find the comparing score(probability of the outer region that bearly contains actual value)
+  predict_mean = pred.predicted_mean.values
+  for j in range(prediction_size):
+    half_interval_size = np.abs(predict_mean[j] - actual_df[j]) #zscore * var  #(var = pred.se_mean())
+    q = half_interval_size/pred.se_mean.values[j] #zscore
+    neg = -1 if (actual_df[j]-predict_mean[j])<0 else 1
+    #the prob. for comparison
+    cm_prob[j] = (1 - pred.dist.cdf(q))*neg
+
+  #for every forecast value, find the comparing score(the percentage difference of actual value to predicted value)
+  cm_perdiff = (actual_df - predict_mean)/predict_mean
+
+  #append to the compare dataframe
+  cm_prob_df[keyword] = cm_prob
+  cm_perdiff_df[keyword] = cm_perdiff
+
+
   breakno+=1
   if breakno>=breaktill: #for test instance only
     break
 clear_output()
-
-
   
+#
+#compare the prob. differences / percentage differences among dates forecasted
+#
+
+cm_prob_df = cm_prob_df.set_index(data.dates[-prediction_size:].values)
+print("According to the probability of actual value to appear")
+for index,i in cm_prob_df.iterrows():
+  i2 = i[i.values>=0] #drop out all negative prob. -> no actual value under prediced value
+  print("the {} hottest keywords in {}\n".format(N,index),i2.nsmallest(n=N))
+
+print("\n\n")
+
+cm_perdiff_df = cm_perdiff_df.set_index(data.dates[-prediction_size:].values)
+print("According to the percentage difference of actual value to predicted value")
+for index,i in cm_perdiff_df.iterrows():
+  print("the {} hottest keywords in {}\n".format(N,index),i.nlargest(n=N))
