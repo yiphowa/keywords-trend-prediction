@@ -30,7 +30,7 @@ def calculate_forecast_errors(df, prediction_size):
     
     return {'MAPE': error_mean('p'), 'MAE': error_mean('e')}
   
-PATH = "/content/drive/MyDrive/scpwr/trend/tmp"
+PATH = "./tmp"
 folder = os.listdir(PATH)
 breakno=0
 breaktill=10
